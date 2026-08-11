@@ -341,3 +341,7 @@ This repository is ready for you to later add:
 - Monitoring, logging, security, and infrastructure automation
 
 Those steps are intentionally **not** included yet so you can learn them hands-on.
+
+## DevOps Learning
+
+This project is being used to practice DevOps concepts including Git, GitHub, Docker, CI/CD, AWS and automation.
