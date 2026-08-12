@@ -24,12 +24,12 @@ beforeAll(async () => {
   }
 
   await mongoose.connect(uri);
-});
+},30000);
 
 afterAll(async () => {
   // Clean up only documents created during this test run when possible
   await mongoose.connection.close();
-});
+},30000);
 
 describe('Health endpoint', () => {
   it('GET /api/health should return ok status', async () => {
