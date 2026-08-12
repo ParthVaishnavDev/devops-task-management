@@ -1,0 +1,9 @@
+services:
+  api:
+    build:
+      context: .
+    container_name: task-management-api
+    ports:
+      - "5050:5000"
+    env_file:
+      - .env
