@@ -7,7 +7,7 @@ const app = express();
 
 // Parse JSON request bodies
 app.use(express.json());
-console.log("HI")
+
 
 // Routes
 app.use('/api/health', healthRoutes);
