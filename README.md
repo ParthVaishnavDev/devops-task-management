@@ -1,8 +1,64 @@
 # Task Management API
 
-A simple, production-style REST API for managing tasks. Built with Node.js, Express, and MongoDB Atlas.
+![CI Pipeline](https://github.com/ParthVaishnavDev/devops-task-management/actions/workflows/ci.yml/badge.svg)
 
-This project is intentionally kept simple so you can learn DevOps practices step by step (Git, Docker, AWS, CI/CD, monitoring, and more) on top of a real working application.
+A simple, production-style REST API for managing tasks. Built with Node.js, Express, and MongoDB Atlas — deployed on AWS with a fully automated CI/CD pipeline.
+
+This project started as a simple app and is being used to learn and demonstrate real-world DevOps practices: containerization, CI/CD, security scanning, and cloud deployment on AWS.
+
+---
+
+## DevOps & Infrastructure
+
+This project isn't just deployed manually — every push to `main` runs through an automated pipeline that tests, security-scans, builds, and deploys the app with zero manual intervention.
+
+### Architecture
+Developer
+│
+▼
+GitHub ──push──▶ GitHub Actions
+│
+├── 1. Checkout code
+├── 2. Install dependencies (npm ci)
+├── 3. Run automated tests (Jest + Supertest, against MongoDB Atlas)
+├── 4. Build Docker image (multi-stage build)
+├── 5. Trivy security scan (blocks on CRITICAL/HIGH vulnerabilities)
+├── 6. Push image → Amazon ECR (private registry)
+│
+▼
+AWS EC2
+│
+├── Pull latest image from ECR
+├── Stop old container
+└── Start new container
+│
+▼
+Nginx (reverse proxy)
+│
+▼
+Application (port 5000)
+
+### DevOps Highlights
+
+- **CI/CD**: Fully automated pipeline via GitHub Actions — every `git push` triggers test → scan → build → deploy, with no manual server access required
+- **Containerization**: Multi-stage Docker build — dependencies are installed in a build stage, and the final image strips out `npm` and dev tooling entirely, reducing both image size and attack surface
+- **Security scanning**: Trivy scans every image for CRITICAL/HIGH vulnerabilities and **fails the pipeline** if any are found — this isn't just a report, it's an enforced gate
+- **Private container registry**: Images are stored in a private Amazon ECR repository, not a public registry
+- **Least-privilege IAM**: Separate, narrowly-scoped IAM users for different systems — one for EC2 (pull-only access to ECR), one for GitHub Actions (push access) — instead of using root or shared credentials
+- **Secrets management**: Database credentials, AWS keys, and SSH keys are stored as encrypted GitHub Actions secrets, never committed to the repository
+- **Zero-touch deployment**: GitHub Actions connects to EC2 via SSH and handles the full container lifecycle (pull → stop old → start new) automatically
+
+### Tech Stack (Infrastructure)
+
+| Tool | Purpose |
+|---|---|
+| Docker | Containerization (multi-stage builds) |
+| GitHub Actions | CI/CD automation |
+| Trivy | Container vulnerability scanning |
+| Amazon ECR | Private Docker image registry |
+| AWS EC2 | Application hosting |
+| Nginx | Reverse proxy |
+| AWS IAM | Least-privilege access control |
 
 ---
 
@@ -14,12 +70,12 @@ This project is intentionally kept simple so you can learn DevOps practices step
 - Priority values: `low`, `medium`, `high`
 - Input validation and consistent JSON responses
 - Centralized error handling
-- Health check endpoint for later deployment and monitoring use
+- Health check endpoint for deployment and monitoring use
 - Basic automated API tests
 
 ---
 
-## Tech Stack
+## Tech Stack (Application)
 
 | Technology | Purpose |
 |---|---|
@@ -35,34 +91,36 @@ This project is intentionally kept simple so you can learn DevOps practices step
 ---
 
 ## Project Structure
-
-```
 project-root/
 │
+├── .github/
+│ └── workflows/
+│ └── ci.yml # CI/CD pipeline definition
+│
 ├── src/
-│   ├── controllers/     # Request handlers (business logic)
-│   │   └── taskController.js
-│   ├── models/          # Mongoose schemas/models
-│   │   └── Task.js
-│   ├── routes/          # Route definitions
-│   │   ├── healthRoutes.js
-│   │   └── taskRoutes.js
-│   ├── middleware/      # Error handling and helpers
-│   │   ├── asyncHandler.js
-│   │   └── errorHandler.js
-│   ├── config/          # Database configuration
-│   │   └── db.js
-│   └── app.js           # Express app setup
+│ ├── controllers/ # Request handlers (business logic)
+│ │ └── taskController.js
+│ ├── models/ # Mongoose schemas/models
+│ │ └── Task.js
+│ ├── routes/ # Route definitions
+│ │ ├── healthRoutes.js
+│ │ └── taskRoutes.js
+│ ├── middleware/ # Error handling and helpers
+│ │ ├── asyncHandler.js
+│ │ └── errorHandler.js
+│ ├── config/ # Database configuration
+│ │ └── db.js
+│ └── app.js # Express app setup
 │
-├── tests/               # Automated API tests
-│   └── tasks.test.js
+├── tests/ # Automated API tests
+│ └── tasks.test.js
 │
-├── server.js            # Application entry point
+├── server.js # Application entry point
+├── Dockerfile # Multi-stage production build
 ├── package.json
-├── .env.example         # Example environment variables
+├── .env.example # Example environment variables
 ├── .gitignore
 └── README.md
-```
 
 ---
 
@@ -82,16 +140,12 @@ You do **not** need to install MongoDB locally. This project uses MongoDB Atlas 
 1. Create a free account at [MongoDB Atlas](https://www.mongodb.com/cloud/atlas).
 2. Create a new **cluster** (the free M0 tier is fine).
 3. Under **Database Access**, create a database user (username + password). Save the password securely.
-4. Under **Network Access**, allow your current IP address (or `0.0.0.0/0` for learning — less secure, fine for practice).
+4. Under **Network Access**, allow your current IP address (or `0.0.0.0/0` — required for GitHub Actions runners, which use dynamic IPs).
 5. Click **Connect** → **Drivers** → copy the connection string.
 
 It looks similar to:
-
-```
 mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/task-manager?retryWrites=true&w=majority
-```
-
-Replace `<username>` and `<password>` with your real credentials.  
+Replace `<username>` and `<password>` with your real credentials.
 Use a database name such as `task-manager` in the connection string (after `.net/`).
 
 ---
@@ -123,13 +177,9 @@ cp .env.example .env
 ```
 
 2. Open `.env` and set your values:
-
-```
-PORT=5000
+3. PORT=5000
 MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/task-manager?retryWrites=true&w=majority
 NODE_ENV=development
-```
-
 | Variable | Description |
 |---|---|
 | `PORT` | Port the API listens on (default `5000`) |
@@ -163,17 +213,35 @@ npm start
 ```
 
 4. You should see messages similar to:
-
-```
-MongoDB connected: cluster0.xxxxx.mongodb.net
+5. MongoDB connected: cluster0.xxxxx.mongodb.net
 Server running in development mode on port 5000
-```
-
 5. Verify the health endpoint:
+6. http://localhost:5000/api/health
 
+7. ---
+
+## Running with Docker
+
+Build and run the production image locally:
+
+```bash
+docker build -t task-management-api .
+docker run -d --name task-management-api -p 5000:5000 --env-file .env task-management-api
 ```
-http://localhost:5000/api/health
-```
+
+The Dockerfile uses a **multi-stage build**: dependencies are installed in a build stage, and the final image contains only the runtime files needed to run the app — no `npm`, no dev dependencies.
+
+---
+
+## CI/CD Pipeline
+
+Every push to `main` triggers `.github/workflows/ci.yml`, which runs three jobs in sequence:
+
+1. **test** — installs dependencies and runs the Jest/Supertest suite against a MongoDB Atlas test database
+2. **build-and-scan** — builds the Docker image and scans it with Trivy; the pipeline fails if any CRITICAL or HIGH severity vulnerabilities are found
+3. **deploy** — pushes the image to Amazon ECR, then connects to the EC2 instance via SSH to pull the new image and restart the container
+
+Each job depends on the previous one passing (`needs:`), so a failing test or a failed security scan blocks deployment entirely.
 
 ---
 
@@ -316,32 +384,30 @@ What is covered:
 ---
 
 ## Request Flow (for learning)
-
-```
 Client request
-  → server.js (starts app + DB connection)
-    → src/app.js (Express middleware + routes)
-      → src/routes/*.js
-        → src/controllers/*.js
-          → src/models/*.js (Mongoose → MongoDB Atlas)
-        ← JSON response
-  → middleware/errorHandler.js (if an error occurs)
-```
-
+→ server.js (starts app + DB connection)
+→ src/app.js (Express middleware + routes)
+→ src/routes/.js
+→ src/controllers/.js
+→ src/models/*.js (Mongoose → MongoDB Atlas)
+← JSON response
+→ middleware/errorHandler.js (if an error occurs)
 ---
 
-## Notes for Your DevOps Journey
+## DevOps Learning Journey
 
-This repository is ready for you to later add:
+This project is being used to practice and demonstrate real-world DevOps skills, building up in stages:
 
-- Git / GitHub
-- Docker / Docker Compose
-- AWS EC2 deployment
-- GitHub Actions (CI/CD)
-- Monitoring, logging, security, and infrastructure automation
-
-Those steps are intentionally **not** included yet so you can learn them hands-on.
-
-## DevOps Learning
-
-This project is being used to practice DevOps concepts including Git, GitHub, Docker, CI/CD, AWS and automation.
+- [x] Git / GitHub version control
+- [x] Docker containerization (multi-stage builds)
+- [x] AWS EC2 deployment with Nginx reverse proxy
+- [x] Amazon ECR private container registry
+- [x] GitHub Actions CI/CD pipeline
+- [x] Automated testing in CI
+- [x] Trivy security scanning as a pipeline gate
+- [x] Least-privilege IAM access control
+- [x] Automated deployment via SSH
+- [ ] HTTPS / TLS (planned — requires a domain)
+- [ ] Monitoring & observability (Prometheus, Grafana, CloudWatch)
+- [ ] Infrastructure as Code (Terraform)
+- [ ] Kubernetes deployment
